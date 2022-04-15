@@ -53,12 +53,18 @@ struct pock{
         size_t prev;
     };
 
+    struct ni_condi{
+
+    };
+
 
     vector<complex> p1_graph;
     vector<pair<int,int> > graph;
     vector<size_t> opt;
     vector<mst_condi> temp;
     vector<size_t> true_opt;
+    vector<double> partial_len;
+    vector<vector<double> > adtable; 
     void read_graph();
     void mst();
     void update(vector<mst_condi>& temp,size_t i);
@@ -69,4 +75,7 @@ struct pock{
     void genperm(size_t len);
     double cost_opt();
     void update_3(vector<mst_condi>& temp,size_t len,size_t local_min_index);
+    void ni();
+    void ni_3();
+    void fill_table();
 };

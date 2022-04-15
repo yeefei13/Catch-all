@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-double dis(pair<int, int> i, pair<int, int> j)
+double dis(const pair<int, int> &i, const pair<int, int> &j)
 {
     return ((double)i.first - (double)j.first) * ((double)i.first - (double)j.first) + ((double)i.second - (double)j.second) * ((double)i.second - (double)j.second);
 }
@@ -156,7 +156,8 @@ void pock::run()
     }
     else if (mode == 2)
     {
-        mst();
+        // mst();
+        ni();
         cost = cost_opt();
         cout << cost << '\n';
         for (auto i : opt)
@@ -166,11 +167,17 @@ void pock::run()
     }
     else
     {
-        mst();
-        cost = cost_opt();
-        temp.clear();
+        fill_table();
+        ni_3();
+        cost = 0;
+        for (size_t i = 0; i < opt.size() - 1; i++)
+        {
+            cost += (adtable[opt[i]][opt[i+1]]);
+        }
+        cost += (adtable[opt[0]][opt.back()]);
+        // cout << cost << '\n';
         tsp();
-        cost = cost_opt();
+        // cost = cost_opt();
         cout << cost << '\n';
         for (auto i : opt)
         {
@@ -188,11 +195,6 @@ void pock::mst()
     else
     {
         temp.resize(graph.size());
-    }
-    if (mode == 2 || mode == 3)
-    {
-        opt.reserve(graph.size());
-        opt.push_back(0);
     }
     temp[0].distance = 0;
     temp[0].linked = true;
@@ -223,17 +225,6 @@ void pock::mst_helper(vector<mst_condi> &temp)
     temp[local_min_index].linked = true;
     cost += sqrt(temp[local_min_index].distance);
     update(temp, local_min_index);
-    if (mode == 2 || mode == 3)
-    {
-        auto it = find(opt.begin(), opt.end(), temp[local_min_index].prev);
-        it = opt.insert(it, local_min_index);
-        auto itt = it;
-        itt++;
-        // size_t i = *itt;
-        // *itt = *it;
-        // *it = i;
-        swap(*it, *itt);
-    }
 }
 
 void pock::update(vector<mst_condi> &temp, size_t cur)
@@ -269,6 +260,11 @@ void pock::update(vector<mst_condi> &temp, size_t cur)
 
 void pock::tsp()
 {
+    true_opt = opt;
+    partial_len.resize(opt.size(),0);
+    // for(size_t i =0; i<opt.size();i++){
+    //     opt[i]=i;
+    // }
     genperm(1);
     opt = true_opt;
 }
@@ -277,7 +273,8 @@ void pock::genperm(size_t len)
 {
     if (len == opt.size())
     {
-        double cur_cost = cost_opt();
+        double cur_cost = partial_len[len - 1] + (adtable[opt[0]][opt.back()]);
+        // cout << cur_cost << '\n';
         if (cur_cost < cost)
         {
             cost = cur_cost;
@@ -292,77 +289,222 @@ void pock::genperm(size_t len)
     for (size_t i = len; i < opt.size(); i++)
     {
         swap(opt[len], opt[i]);
+        partial_len[len] = partial_len[len - 1] + (adtable[opt[len]][opt[len-1]]);
         genperm(len + 1);
         swap(opt[len], opt[i]);
     }
 }
 
-void pock::update_3(vector<mst_condi>& temp,size_t len,size_t local_min_index){
-    for (size_t i = len+1; i < temp.size(); i++)
+void pock::update_3(vector<mst_condi> &temp3, size_t len, size_t local_min_index)
+{
+    for (size_t i = len; i < opt.size(); i++)
+    {
+        if (!temp3[opt[i]].linked)
         {
-            if (!temp[opt[i]].linked)
+            double cur_dis = adtable[opt[i]][local_min_index];
+            if (cur_dis < temp3[opt[i]].distance)
             {
-                double cur_dis = dis(graph[opt[i]], graph[local_min_index]);
-                if (cur_dis < temp[opt[i]].distance)
-                {
-                    temp[opt[i]].distance = cur_dis;
-                    temp[opt[i]].prev = local_min_index;
-                }
+                temp3[opt[i]].distance = cur_dis;
+                // cout<< "current x: "<<graph[opt[i]].first << " "<< graph[local_min_index].first<< " current y: "<<graph[opt[i]].second 
+                // << " "<< graph[local_min_index].second<<" "<< local_min_index<<'\n';
+                // cout << "currrent best "<< sqrt(cur_dis)<< "  "<<i<<'\n'; 
+                // temp[opt[i]].prev = local_min_index;
             }
         }
+    }
 }
 
 bool pock::check(size_t len)
 {
-    double cur_cost = 0;
-    //turn the first len line to true;
-    for (size_t i = 0; i < len; i++)
-    {
-        temp[opt[i]].linked = true;
-        cur_cost += sqrt(dis(graph[opt[i]], graph[opt[i + 1]]));
+    if(opt.size() - len <= 4){
+        return true;
     }
-    //set for opt[len]
-    temp[opt[len]].linked = true;
-    update_3(temp,len,len);
+    vector<mst_condi> temp3;
+    temp3.resize(opt.size());
+    double cur_cost = 0;
+    cur_cost += partial_len[len - 1];
+    // set for opt[len]
+    temp3[opt[len]].linked = true;
+    update_3(temp3, len, opt[len]);
 
-    //mst the rest part
-    for (size_t i = len+1; i < opt.size(); i++)
+    // mst the rest part
+    for (size_t i = len + 1; i < opt.size(); i++)
     {
         double local_min = numeric_limits<double>::infinity();
-        size_t local_min_index = 0;
-        for (size_t j = 1; j < temp.size(); j++)
+        size_t local_min_index = 10;
+        for (size_t j = len + 1; j < opt.size(); j++)
         {
-            if (temp[opt[j]].distance < local_min && !temp[opt[j]].linked)
+            if (temp3[opt[j]].distance < local_min && !temp3[opt[j]].linked)
             {
-                local_min = temp[opt[j]].distance;
+                local_min = temp3[opt[j]].distance;
                 local_min_index = opt[j];
             }
         }
-        temp[local_min_index].linked = true;
-        cur_cost += sqrt(temp[local_min_index].distance);
-        update_3(temp,len,local_min_index);
+        temp3[local_min_index].linked = true;
+        cur_cost += (temp3[local_min_index].distance);
+        update_3(temp3, len, local_min_index);
     }
+    // add two line
+    double cur_min = adtable[opt[0]][opt.back()];
+    double cur_min2 = adtable[opt[len-1]][opt.back()];
 
-    double cur_min =numeric_limits<double>::infinity();
-    double cur_min2 = numeric_limits<double>::infinity();
-    for(size_t i = 0; i<len; i++){
-        for(size_t j = len; j<opt.size(); j++){
-            double cur_num = dis(graph[opt[i]],graph[opt[j]]);
-            if(cur_num < cur_min){
-                swap(cur_min,cur_num);
-            }
-            if(cur_num<cur_min2){
-                swap(cur_min2,cur_num);
-            }
+    for (size_t j = len; j < opt.size(); j++)
+    {
+        double cur_num = adtable[opt[0]][opt[j]];
+        double cur_num2 = adtable[opt[len-1]][opt[j]];
+        if (cur_num < cur_min)
+        {
+            swap(cur_min, cur_num);
+        }
+        if (cur_num2 < cur_min2)
+        {
+            swap(cur_min2, cur_num2);
         }
     }
-    cur_cost+= sqrt(cur_min) + sqrt(cur_min2);
-    
-    for (size_t i = 1; i < temp.size(); i++)
-    {
-        temp[i].linked = false;
-    }
+    cur_cost += (cur_min) + (cur_min2);
+    // cout<< cur_cost<< " "<< cost<<'\n';
     return cur_cost < cost;
 }
 
+void pock::ni_3()
+{
+    opt.reserve(adtable.size());
+    opt.push_back(0);
+    opt.push_back(1);
+    for (size_t i = 2; i < adtable.size(); i++)
+    {
+        size_t x;
+        double min = numeric_limits<double>::infinity();
+        double temp = 0;
+        for (size_t j = 0; j < i - 1; j++)
+        {
+            temp = (adtable[i][opt[j]]) + (adtable[i][opt[j+1]]) - (adtable[opt[j]][opt[j+1]]);
+            if (temp < min)
+            {
+                min = temp;
+                x = opt[j + 1];
+            }
+        }
+        temp = (adtable[i][opt[0]]) + (adtable[i][opt.back()]) - (adtable[opt[0]][opt.back()]);
+        if (temp < min)
+        {
+            opt.push_back(i);
+        }
+        else
+        {
+            opt.insert(find(opt.begin(), opt.end(), x), i);
+        }
+    }
+    for (auto i = opt.begin(),p=i+1; p<opt.end(); i++,p++){
+        for(auto  k=i+2,l=i+3; l<opt.end(); k++,l++){
+            double a = adtable[*i][*p] + adtable[*l][*k];
+            double b = adtable[*i][*k] + adtable[*p][*l];
+            if(b<a){
+                reverse(p,k+1);
+            }
+        }
+    }
+}
 
+void pock::ni()
+{
+    opt.reserve(graph.size());
+    opt.push_back(0);
+    opt.push_back(1);
+    for (size_t i = 2; i < graph.size(); i++)
+    {
+        size_t x;
+        // size_t k;
+        // double min_c = numeric_limits<double>::infinity();
+        double min = numeric_limits<double>::infinity();
+        double temp = 0;
+        // for(size_t j = 0; j<i;j++){
+        //     for (size_t p = i; p < graph.size(); p++){
+        //         if(dis(graph[opt[j]],graph[p])<min_c){
+        //             min_c = dis(graph[opt[j]],graph[p]);
+        //             k = p;
+        //         }
+        //     }
+        // }
+        for (size_t j = 0; j < i - 1; j++)
+        {
+            temp = sqrt(dis(graph[i], graph[opt[j]])) + sqrt(dis(graph[i], graph[opt[j + 1]])) - sqrt(dis(graph[opt[j]], graph[opt[j + 1]]));
+            if (temp < min)
+            {
+                min = temp;
+                x = opt[j + 1];
+            }
+        }
+        temp = sqrt(dis(graph[i], graph[opt[0]])) + sqrt(dis(graph[i], graph[opt.back()])) - sqrt(dis(graph[opt[0]], graph[opt.back()]));
+        // cout << temp <<"  "<< min << '\n';
+        if (temp < min)
+        {
+            opt.push_back(i);
+        }
+        else
+        {
+            opt.insert(find(opt.begin(), opt.end(), x), i);
+        }
+    }
+}
+
+// void pock::ni_3()
+// {
+//     opt.reserve(graph.size());
+//     opt.push_back(0);
+//     opt.push_back(1);
+//     for (size_t i = 2; i < graph.size(); i++)
+//     {
+//         size_t x;;
+//         double min = numeric_limits<double>::infinity();
+//         double temp = 0;
+//         for (size_t j = 0; j < i - 1; j++)
+//         {
+//             temp = sqrt(dis(graph[i], graph[opt[j]])) + sqrt(dis(graph[i], graph[opt[j + 1]])) - sqrt(dis(graph[opt[j]], graph[opt[j + 1]]));
+//             if (temp < min)
+//             {
+//                 min = temp;
+//                 x = opt[j + 1];
+//             }
+//         }
+//         temp = sqrt(dis(graph[i], graph[opt[0]])) + sqrt(dis(graph[i], graph[opt.back()])) - sqrt(dis(graph[opt[0]], graph[opt.back()]));
+//         // cout << temp <<"  "<< min << '\n';
+//         if (temp < min)
+//         {
+//             opt.push_back(i);
+//         }
+//         else
+//         {
+//             opt.insert(find(opt.begin(), opt.end(), x), i);
+//         }
+//     }
+//     for (auto i = opt.begin(); i!=opt.end(); i++){
+//         auto k =i;
+//         k++;
+//         for(; k!=opt.end(); k++){
+//             auto j = i;
+//             j++;
+//             auto ii = i;
+//             auto jj = j;
+//             ii++;
+//             jj++;
+//             double a = dis(graph[(*i)],graph[*ii]) + dis(graph[(*j)],graph[(*jj)]);
+//             double b = dis(graph[(*j)],graph[*ii]) + dis(graph[(*i)],graph[(*jj)]);
+//             if(b<a){
+//                 reverse(ii,jj);
+//             }
+//         }
+//     }
+// }
+
+void pock::fill_table(){
+    vector<double> temp;
+    temp.resize(graph.size());
+    adtable.resize(graph.size(),temp);
+    for(size_t i = 0; i< graph.size(); i++){
+        for(size_t j = 0; j<graph.size(); j++){
+            adtable[i][j] = sqrt(dis(graph[i],graph[j]));
+        }
+    }
+    graph.clear();
+}
